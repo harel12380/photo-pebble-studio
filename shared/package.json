@@ -1,0 +1,17 @@
+{
+  "name": "@pebble/shared",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./cardFormat": "./src/cardFormat.ts",
+    "./editModel": "./src/editModel.ts",
+    "./message": "./src/message.ts",
+    "./manifest": "./src/manifest.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  }
+}

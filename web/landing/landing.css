@@ -1,0 +1,319 @@
+/* Landing-only styles — dark cinematic redesign.
+ *
+ * Techniques (per the 2026 engineering brief):
+ * - IntersectionObserver reveals as the primary entrance animation (Firefox
+ *   stable still ships `animation-timeline` behind a flag), with CSS
+ *   scroll-driven parallax layered on as progressive enhancement.
+ * - Spotlight radial glows + SVG grain to avoid gradient banding.
+ * - `@property` conic border, gradient text sheen, spotlight hover cards.
+ * - Everything degrades gracefully under `prefers-reduced-motion`.
+ *
+ * RTL notes: this page is Hebrew-only, so directional effects are authored
+ * RTL-first — the sheen sweeps right→left (reading direction) and the marquee
+ * translates +x. */
+
+/* ---- Display type ------------------------------------------------------ */
+.font-display {
+  font-family: "Suez One", "Heebo", system-ui, sans-serif;
+  font-weight: 400;
+  /* Hebrew display type wants a bit more leading and no negative tracking. */
+  line-height: 1.15;
+  letter-spacing: 0;
+}
+
+/* ---- Film grain -------------------------------------------------------- */
+/* One fixed SVG feTurbulence layer over everything; kills banding on the
+ * large blurred glows and adds a cinematic texture. Zero runtime cost. */
+.grain {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ---- Spotlight glows --------------------------------------------------- */
+/* Big soft radial "stage lights". Warm amber suits the handmade / e-ink
+ * character better than SaaS purple. */
+.glow-hero {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 80% 55% at 50% -12%, rgb(251 191 36 / 0.16), transparent 62%),
+    radial-gradient(ellipse 42% 34% at 78% 8%, rgb(244 114 182 / 0.07), transparent 60%),
+    radial-gradient(ellipse 46% 36% at 18% 16%, rgb(96 165 250 / 0.06), transparent 60%);
+}
+.glow-cta {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: radial-gradient(ellipse 70% 65% at 50% 112%, rgb(251 191 36 / 0.13), transparent 65%);
+}
+
+/* ---- Scroll reveal (IntersectionObserver path) ------------------------- */
+.reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition:
+    opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: var(--reveal-delay, 0ms);
+  will-change: opacity, transform;
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* Staggered hero entrance (runs on load, not on scroll). */
+.hero-rise {
+  animation: hero-rise 1s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--rise-delay, 0ms);
+}
+@keyframes hero-rise {
+  from {
+    opacity: 0;
+    transform: translateY(34px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---- Gradient text sheen ------------------------------------------------ */
+/* Clipped into the headline; the highlight travels right→left with the
+ * Hebrew reading direction. */
+.sheen {
+  background: linear-gradient(
+    -100deg,
+    #fde68a 20%,
+    #fff7ed 38%,
+    #f59e0b 52%,
+    #fde68a 70%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: sheen 6s ease-in-out infinite;
+}
+@keyframes sheen {
+  0%,
+  100% {
+    background-position: 0% 0;
+  }
+  50% {
+    background-position: 100% 0;
+  }
+}
+
+/* ---- Conic glow border (@property — Baseline 2024) ---------------------- */
+@property --border-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+.glow-border {
+  position: relative;
+}
+.glow-border::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  border-radius: inherit;
+  background: conic-gradient(
+    from var(--border-angle),
+    transparent 62%,
+    rgb(251 191 36 / 0.65) 74%,
+    rgb(253 230 138 / 0.9) 78%,
+    rgb(251 191 36 / 0.65) 82%,
+    transparent 94%
+  );
+  animation: border-spin 7s linear infinite;
+}
+@keyframes border-spin {
+  to {
+    --border-angle: 360deg;
+  }
+}
+
+/* ---- Marquee (spec strip) ----------------------------------------------- */
+/* Content is duplicated twice in the DOM; the track slides +x (RTL forward)
+ * by half its width, then loops. Faded at both edges with a mask. */
+.marquee {
+  overflow: hidden;
+  mask-image: linear-gradient(to right, transparent, #000 12% 88%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 12% 88%, transparent);
+}
+.marquee-track {
+  display: flex;
+  gap: 0.75rem;
+  width: max-content;
+  animation: marquee 36s linear infinite;
+}
+.marquee:hover .marquee-track {
+  animation-play-state: paused;
+}
+@keyframes marquee {
+  to {
+    translate: 50% 0;
+  }
+}
+
+/* ---- Sticky story chapter ----------------------------------------------- */
+/* The device pins while captions scroll past; the active caption swaps the
+ * pinned scene via a data attribute (set by an IntersectionObserver). */
+.story-scene {
+  opacity: 0;
+  transform: scale(0.96);
+  transition:
+    opacity 0.7s ease,
+    transform 0.7s ease;
+}
+.story-scene.is-active {
+  opacity: 1;
+  transform: none;
+}
+.story-caption {
+  opacity: 0.25;
+  transition: opacity 0.5s ease;
+}
+.story-caption.is-active {
+  opacity: 1;
+}
+
+/* ---- Spotlight hover cards (bento) -------------------------------------- */
+/* Pointer position is written to --mx/--my by a tiny JS handler. */
+.spot-card {
+  position: relative;
+  overflow: hidden;
+}
+.spot-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+  background: radial-gradient(
+    280px circle at var(--mx, 50%) var(--my, 50%),
+    rgb(251 191 36 / 0.09),
+    transparent 65%
+  );
+}
+.spot-card:hover::after {
+  opacity: 1;
+}
+
+/* ---- The floating e-ink "device" mockup --------------------------------- */
+.device {
+  animation: float 8s ease-in-out infinite;
+  transform-style: preserve-3d;
+}
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-0.6deg);
+  }
+  50% {
+    transform: translateY(-12px) rotate(0.6deg);
+  }
+}
+
+/* Colour-band shimmer evoking a Spectra-6 refresh sweeping the panel. */
+.eink-sweep {
+  background: linear-gradient(
+    115deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.55) 45%,
+    rgba(255, 255, 255, 0.85) 50%,
+    rgba(255, 255, 255, 0.55) 55%,
+    transparent 100%
+  );
+  background-size: 260% 100%;
+  animation: sweep 6s ease-in-out infinite;
+  mix-blend-mode: overlay;
+}
+@keyframes sweep {
+  0% {
+    background-position: 180% 0;
+  }
+  55%,
+  100% {
+    background-position: -80% 0;
+  }
+}
+
+/* ---- Scroll cue ---------------------------------------------------------- */
+.scroll-cue {
+  animation: nudge 2s ease-in-out infinite;
+}
+@keyframes nudge {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  50% {
+    transform: translateY(8px);
+    opacity: 0.9;
+  }
+}
+
+/* ---- Scroll-driven parallax (progressive enhancement) -------------------- */
+/* Firefox stable lacks animation-timeline; there it simply stays static. */
+@supports (animation-timeline: view()) {
+  .parallax-slow,
+  .parallax-fast {
+    animation: parallax linear both;
+    animation-timeline: view();
+    animation-range: cover;
+    animation-duration: 1ms; /* Firefox requires non-zero duration */
+  }
+  .parallax-slow {
+    --parallax: 42px;
+  }
+  .parallax-fast {
+    --parallax: 90px;
+  }
+  @keyframes parallax {
+    from {
+      transform: translateY(var(--parallax));
+    }
+    to {
+      transform: translateY(calc(var(--parallax) * -1));
+    }
+  }
+}
+
+/* ---- Reduced motion: hold everything still ------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .hero-rise,
+  .sheen,
+  .glow-border::before,
+  .marquee-track,
+  .device,
+  .eink-sweep,
+  .scroll-cue,
+  .parallax-slow,
+  .parallax-fast {
+    animation: none;
+  }
+  .story-scene,
+  .story-caption,
+  .spot-card::after {
+    transition: none;
+  }
+}

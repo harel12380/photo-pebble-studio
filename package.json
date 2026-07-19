@@ -1,0 +1,27 @@
+{
+  "name": "photo-pebble",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Photo Pebble Studio — the browser app that prepares photos for a 6-colour e-ink photo frame.",
+  "license": "MIT",
+  "type": "module",
+  "workspaces": [
+    "shared",
+    "web"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace web",
+    "build": "npm run build --workspace web",
+    "test": "npm run test --workspace shared && npm run test --workspace web",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.22.4",
+    "typescript": "^5.7.2",
+    "vitest": "^4.1.9"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,19 @@
+# dependencies
+node_modules/
+.npm/
+
+# build output
+dist/
+*.tsbuildinfo
+
+# editor / OS
+.DS_Store
+*.log
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# test / coverage
+coverage/
+playwright-report/
+test-results/

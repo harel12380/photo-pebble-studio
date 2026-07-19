@@ -1,0 +1,6 @@
+# Normalise line endings so a Windows/OneDrive checkout does not report every
+# file as modified. Git stores LF; working trees get the platform-native ending.
+* text=auto
+
+*.png binary
+*.svg text eol=lf
