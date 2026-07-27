@@ -251,6 +251,39 @@
   }
 }
 
+/* ---- Real-time 3D pebble viewer ----------------------------------------- */
+/* The WebGL canvas wrapper: same silhouette footprint as the old flat
+ * mockup (rounded, dark, soft-lit) so it drops into the same layout slots. */
+.pebble-canvas {
+  position: relative;
+  width: 100%;
+  border-radius: 1.75rem;
+  overflow: hidden;
+  cursor: grab;
+  filter: drop-shadow(0 40px 80px rgba(0, 0, 0, 0.55));
+}
+.pebble-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse at center, rgb(24 24 27 / 0.35), transparent 70%);
+}
+.pebble-spinner {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9999px;
+  border: 2px solid rgb(251 191 36 / 0.25);
+  border-top-color: rgb(251 191 36 / 0.85);
+  animation: pebble-spin 0.9s linear infinite;
+}
+@keyframes pebble-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* ---- Scroll cue ---------------------------------------------------------- */
 .scroll-cue {
   animation: nudge 2s ease-in-out infinite;
@@ -308,7 +341,8 @@
   .eink-sweep,
   .scroll-cue,
   .parallax-slow,
-  .parallax-fast {
+  .parallax-fast,
+  .pebble-spinner {
     animation: none;
   }
   .story-scene,

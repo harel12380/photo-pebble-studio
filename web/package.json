@@ -23,13 +23,15 @@
     "@thisbeyond/solid-dnd": "^0.7.5",
     "comlink": "^4.4.2",
     "jszip": "^3.10.1",
-    "solid-js": "^1.9.13"
+    "solid-js": "^1.9.13",
+    "three": "^0.185.1"
   },
   "devDependencies": {
     "@solidjs/testing-library": "^0.8.10",
     "@tailwindcss/vite": "^4.3.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/user-event": "^14.6.1",
+    "@types/three": "^0.185.1",
     "jsdom": "^29.1.1",
     "playwright": "^1.61.0",
     "tailwindcss": "^4.3.1",

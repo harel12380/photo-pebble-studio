@@ -1,7 +1,8 @@
 import { type JSX, For, createSignal, onCleanup, onMount } from "solid-js";
 import { Device, SceneLandscape, SceneNight, ScenePortrait } from "./Device";
+import { PebbleModel } from "./PebbleModel";
 import { Reveal } from "./motion";
-import { Placeholder, SpecChip, SpotlightCard } from "./components";
+import { SpecChip, SpotlightCard } from "./components";
 
 /** URL of the studio app. From /landing/ the studio root is one level up.
  *  Deliberately linked ONLY at the end of the page — the landing tells the
@@ -61,8 +62,11 @@ function Hero(): JSX.Element {
         </a>
 
         <div class="hero-rise mt-16 w-full" style={{ "--rise-delay": "480ms" }}>
-          <Device />
+          <PebbleModel />
         </div>
+        <p class="hero-rise mt-4 text-xs text-zinc-600" style={{ "--rise-delay": "560ms" }}>
+          זו לא הדמיה — זה הדגם המדויק שהודפס ונבנה. אפשר לגרור ולסובב.
+        </p>
       </div>
 
       {/* Spec marquee — pauses on hover, static under reduced-motion */}
@@ -283,19 +287,23 @@ function Craft(): JSX.Element {
             מעטפת בעבודת יד
           </h2>
           <p class="mt-6 text-lg leading-relaxed text-zinc-400">
-            הקופסה עוצבה מאפס והודפסה בתלת־ממד במיוחד עבור המסגרת הזו — מותאמת
-            לכל רכיב, עם רצועה לתלייה או להצבה. מתנה אחת ויחידה, לא מוצר מהמדף.
+            הקופסה עוצבה מאפס ונבנתה בתלת־ממד במיוחד עבור המסגרת הזו — אבן
+            נהר חלקה בעץ אלון, עם שני כפתורי פליז מוסתרים בצד. מתנה אחת
+            ויחידה, לא מוצר מהמדף.
           </p>
           <p class="mt-4 text-lg leading-relaxed text-zinc-400">
-            אפשר לתלות אותה בכל כיוון, ואת כיוון התמונה בוחרים בסטודיו.
+            כל עיקול נמדד ונבדק כדי שהמסך, הכפתורים והחיווט יתאימו בדיוק
+            לרכיבים האמיתיים שבפנים.
           </p>
         </Reveal>
         <Reveal delay={120} class="grid gap-4 sm:grid-cols-2">
-          <div class="parallax-slow">
-            <Placeholder caption="תמונה: המעטפת מקרוב" ratio="1 / 1" />
+          <div class="parallax-slow flex flex-col items-center gap-3">
+            <PebbleModel initialYaw={0.15} />
+            <span class="text-sm text-zinc-500">מלפנים — המסך והמסגרת</span>
           </div>
-          <div class="parallax-fast">
-            <Placeholder caption="תמונה: המסגרת בסלון" ratio="1 / 1" />
+          <div class="parallax-fast flex flex-col items-center gap-3">
+            <PebbleModel initialYaw={Math.PI - 0.35} />
+            <span class="text-sm text-zinc-500">מאחור — עץ האלון והכיפה</span>
           </div>
         </Reveal>
       </div>
