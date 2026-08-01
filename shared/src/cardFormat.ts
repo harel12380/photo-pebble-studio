@@ -217,7 +217,8 @@ export interface CardConfig {
   /**
    * Index (into `photos`) of the item to show FIRST after new card data is
    * inserted — typically a message card marked "show first" in the studio.
-   * Omitted when nothing is pinned.
+   * The frame HOLDS on it (no timed advance) until the first button press, so
+   * the message waits for its reader. Omitted when nothing is pinned.
    */
   intro_index?: number;
   photos: CardConfigPhoto[];

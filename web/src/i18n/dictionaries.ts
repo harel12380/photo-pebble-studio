@@ -194,7 +194,7 @@ const he: Dict = {
   "message.placement.random": "בסבב הרגיל",
   "message.placement.intro": "ראשון אחרי עדכון כרטיס",
   "message.placement.hint":
-    "\"ראשון אחרי עדכון כרטיס\" יוצג פעם אחת מיד כשהמסגרת נדלקת עם כרטיס שעודכן, ואחר כך ישתלב בסבב האקראי. רק פריט אחד יכול להיות ראשון.",
+    "\"ראשון אחרי עדכון כרטיס\" יוצג מיד כשהמסגרת נדלקת עם כרטיס שעודכן ויישאר על המסך עד הלחיצה הראשונה על הקדימה/אחורה — ורק אז ישתלב בסבב האקראי. רק פריט אחד יכול להיות ראשון.",
   "pos.top": "למעלה",
   "pos.bottom": "למטה",
   "pos.center": "מרכז",
@@ -440,7 +440,7 @@ const en: Dict = {
   "message.placement.random": "In the regular rotation",
   "message.placement.intro": "First after a card update",
   "message.placement.hint":
-    "\"First after a card update\" shows once, right when the frame powers up with a freshly updated card, then joins the random rotation. Only one item can be first.",
+    "\"First after a card update\" shows right when the frame powers up with a freshly updated card and stays on screen until the first Prev/Next press — only then does it join the random rotation. Only one item can be first.",
   "pos.top": "Top",
   "pos.bottom": "Bottom",
   "pos.center": "Center",
