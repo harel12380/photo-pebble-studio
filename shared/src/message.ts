@@ -49,9 +49,12 @@ export type MessageLayout = "card" | "band" | "overlay";
  *              (fresh export inserted), and HELD there — the interval is
  *              paused, so a message meant to be read cannot scroll away on
  *              its own. The first Prev/Next press releases the hold and the
- *              item joins the random rotation from then on. At most one item
- *              per card is the intro — the studio enforces this and exports
- *              it as config.json `intro_index`.
+ *              item joins the random rotation from then on. It also shows
+ *              again when a card the frame saw leave comes back (the frame
+ *              has no card-detect line, so it only notices a swap it was
+ *              awake for). At most one item per card is the intro — the
+ *              studio enforces this and exports it as config.json
+ *              `intro_index`.
  */
 export type MessagePlacement = "random" | "intro";
 
