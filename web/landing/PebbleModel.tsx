@@ -1,16 +1,20 @@
 import { type JSX, Show, createSignal, onCleanup, onMount } from "solid-js";
-import * as THREE from "three";
-import { STLLoader } from "three/addons/loaders/STLLoader.js";
+// three.js is ~350 kB of the landing bundle and is only ever needed by this one
+// component, which sits several screens down the page. Import it for types only
+// here and pull the runtime in dynamically once the section is approached — see
+// `init()` below.
+import type * as THREE_NS from "three";
 import { prefersReducedMotion } from "./motion";
 import { Device } from "./Device";
 
 /**
- * Real Photo Pebble geometry (v12, the current enclosure — see
- * enclosure/fusion/DESIGN-NOTES.md §7m). Same STLs the owner actually
- * printed, served from web/public/models/pebble-v12/ so this viewer never
- * drifts from the physical object.
+ * Real Photo Pebble geometry (v14, the current enclosure — see
+ * enclosure/fusion/DESIGN-NOTES.md §7o/§7p). These are the exact STLs that go
+ * to the slicer, served from web/public/models/pebble-v14/ so this viewer never
+ * drifts from the physical object — and so it matches the rendered stills and
+ * the turntable elsewhere on this page, which come from the same CAD.
  */
-const MODEL_BASE = "../models/pebble-v12/";
+const MODEL_BASE = "../models/pebble-v14/";
 const PARTS: Array<{ file: string; material: "wood" | "brass" }> = [
   { file: "front_shell.stl", material: "wood" },
   { file: "back_shell.stl", material: "wood" },
@@ -35,7 +39,12 @@ const SCREEN_POS: [number, number, number] = [0, 5, -14.85];
 
 type SceneId = 0 | 1 | 2;
 
-function drawScreen(ctx: CanvasRenderingContext2D, w: number, h: number, scene: SceneId) {
+function drawScreen(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  scene: SceneId,
+) {
   ctx.clearRect(0, 0, w, h);
   if (scene === 0) {
     // Landscape — sky, sun, hills, tree (mirrors SceneLandscape in Device.tsx).
@@ -139,204 +148,282 @@ export function PebbleModel(props: PebbleModelProps): JSX.Element {
   onMount(() => {
     if (!container) return;
     let disposed = false;
-    let raf = 0;
-    let renderer: THREE.WebGLRenderer;
+    let teardown: (() => void) | undefined;
 
-    try {
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    } catch {
-      setFailed(true);
-      return;
-    }
-
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.domElement.style.width = "100%";
-    renderer.domElement.style.height = "100%";
-    renderer.domElement.style.display = "block";
-    renderer.domElement.style.touchAction = "pan-y";
-    container.appendChild(renderer.domElement);
-
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(30, 1, 1, 4000);
-
-    scene.add(new THREE.AmbientLight(0xfff2df, 0.7));
-    const key = new THREE.DirectionalLight(0xffe3ab, 1.6);
-    key.position.set(-90, 140, -160);
-    scene.add(key);
-    const rim = new THREE.DirectionalLight(0x8fb3ff, 0.6);
-    rim.position.set(90, 50, 170);
-    scene.add(rim);
-    const fill = new THREE.DirectionalLight(0xffffff, 0.22);
-    fill.position.set(140, -60, -40);
-    scene.add(fill);
-
-    const pebble = new THREE.Group();
-    pebble.rotation.y = props.initialYaw ?? 0.55;
-    scene.add(pebble);
-
-    const woodMat = new THREE.MeshPhysicalMaterial({
-      color: 0xa9764a,
-      roughness: 0.52,
-      metalness: 0.04,
-      clearcoat: 0.16,
-      clearcoatRoughness: 0.45,
-    });
-    const brassMat = new THREE.MeshStandardMaterial({
-      color: 0xd8b46a,
-      roughness: 0.28,
-      metalness: 0.9,
-    });
-
-    // The screen — a canvas texture over the real window cutout, double-sided
-    // so it reads correctly regardless of which way the plane's normal ends up.
-    const screenCanvas = document.createElement("canvas");
-    screenCanvas.width = 512;
-    screenCanvas.height = Math.round((512 / SCREEN_W) * SCREEN_H);
-    const screenCtx = screenCanvas.getContext("2d");
-    const screenTex = new THREE.CanvasTexture(screenCanvas);
-    screenTex.colorSpace = THREE.SRGBColorSpace;
-    const screenMesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(SCREEN_W, SCREEN_H),
-      new THREE.MeshBasicMaterial({ map: screenTex, side: THREE.DoubleSide }),
+    // Nothing three.js-shaped happens until the viewer is within one screen of
+    // the viewport. Before that this component costs one IntersectionObserver.
+    const nearObserver = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((e) => e.isIntersecting)) return;
+        nearObserver.disconnect();
+        void init();
+      },
+      { rootMargin: "100% 0px 100% 0px" },
     );
-    screenMesh.position.set(...SCREEN_POS);
-    if (screenCtx) drawScreen(screenCtx, screenCanvas.width, screenCanvas.height, 0);
-    screenTex.needsUpdate = true;
-
-    const loader = new STLLoader();
-    Promise.all(
-      PARTS.map(({ file, material }) =>
-        loader.loadAsync(MODEL_BASE + file).then((geometry) => {
-          geometry.computeVertexNormals();
-          const mesh = new THREE.Mesh(geometry, material === "wood" ? woodMat : brassMat);
-          pebble.add(mesh);
-        }),
-      ),
-    )
-      .then(() => {
-        if (disposed) return;
-        pebble.add(screenMesh);
-
-        // Recentre on the true combined bounding box, then frame the camera
-        // to it — robust to the exact mm envelope rather than a hardcoded guess.
-        const box = new THREE.Box3().setFromObject(pebble);
-        const center = box.getCenter(new THREE.Vector3());
-        pebble.children.forEach((child) => {
-          child.position.sub(center);
-        });
-        const size = box.getSize(new THREE.Vector3());
-        const radius = size.length() / 2;
-        const dist = radius / Math.sin((camera.fov * Math.PI) / 360) * 1.35;
-        camera.position.set(0, radius * 0.14, -dist);
-        camera.lookAt(0, 0, 0);
-        camera.near = dist / 50;
-        camera.far = dist * 8;
-        camera.updateProjectionMatrix();
-
-        setReady(true);
-      })
-      .catch(() => {
-        if (!disposed) setFailed(true);
-      });
-
-    // --- sizing -------------------------------------------------------
-    const resize = () => {
-      if (!container) return;
-      const w = container.clientWidth || 1;
-      const h = container.clientHeight || 1;
-      renderer.setSize(w, h, false);
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
-    };
-    const ro = new ResizeObserver(resize);
-    ro.observe(container);
-    resize();
-
-    // --- drag-to-rotate -------------------------------------------------
-    let dragging = false;
-    let lastX = 0;
-    const el = renderer.domElement;
-    const onDown = (e: PointerEvent) => {
-      dragging = true;
-      lastX = e.clientX;
-      el.setPointerCapture(e.pointerId);
-      el.style.cursor = "grabbing";
-    };
-    const onMove = (e: PointerEvent) => {
-      if (!dragging) return;
-      const dx = e.clientX - lastX;
-      lastX = e.clientX;
-      pebble.rotation.y += dx * 0.012;
-    };
-    const onUp = (e: PointerEvent) => {
-      dragging = false;
-      el.style.cursor = "grab";
-      try {
-        el.releasePointerCapture(e.pointerId);
-      } catch {
-        /* already released */
-      }
-    };
-    el.style.cursor = "grab";
-    el.addEventListener("pointerdown", onDown);
-    el.addEventListener("pointermove", onMove);
-    el.addEventListener("pointerup", onUp);
-    el.addEventListener("pointercancel", onUp);
-
-    // --- e-ink screen cycle: draw → flash white → next scene -----------
-    let sceneIndex: SceneId = 0;
-    const cycleScreen = () => {
-      if (!screenCtx) return;
-      screenCtx.fillStyle = INK.paper;
-      screenCtx.fillRect(0, 0, screenCanvas.width, screenCanvas.height);
-      screenTex.needsUpdate = true;
-      window.setTimeout(() => {
-        sceneIndex = (((sceneIndex + 1) % 3) as SceneId);
-        drawScreen(screenCtx, screenCanvas.width, screenCanvas.height, sceneIndex);
-        screenTex.needsUpdate = true;
-      }, 260);
-    };
-    const cycleInterval = prefersReducedMotion() ? 0 : window.setInterval(cycleScreen, 4800);
-
-    // --- render loop -----------------------------------------------------
-    const reduced = prefersReducedMotion();
-    const autoRotate = (props.autoRotate ?? true) && !reduced;
-    const loop = () => {
-      if (disposed) return;
-      raf = requestAnimationFrame(loop);
-      if (autoRotate && !dragging && document.visibilityState === "visible") {
-        pebble.rotation.y += 0.0032;
-      }
-      renderer.render(scene, camera);
-    };
-    loop();
+    nearObserver.observe(container);
 
     onCleanup(() => {
       disposed = true;
-      cancelAnimationFrame(raf);
-      if (cycleInterval) window.clearInterval(cycleInterval);
-      ro.disconnect();
-      el.removeEventListener("pointerdown", onDown);
-      el.removeEventListener("pointermove", onMove);
-      el.removeEventListener("pointerup", onUp);
-      el.removeEventListener("pointercancel", onUp);
-      pebble.traverse((obj) => {
-        if (obj instanceof THREE.Mesh) obj.geometry.dispose();
-      });
-      woodMat.dispose();
-      brassMat.dispose();
-      screenTex.dispose();
-      renderer.dispose();
-      container?.removeChild(renderer.domElement);
+      nearObserver.disconnect();
+      teardown?.();
     });
+
+    async function init() {
+      if (disposed || !container) return;
+
+      let THREE: typeof THREE_NS;
+      let STLLoader: typeof import("three/addons/loaders/STLLoader.js").STLLoader;
+      try {
+        [THREE, { STLLoader }] = await Promise.all([
+          import("three"),
+          import("three/addons/loaders/STLLoader.js"),
+        ]);
+      } catch {
+        setFailed(true);
+        return;
+      }
+      if (disposed || !container) return;
+
+      let raf = 0;
+      let renderer: THREE_NS.WebGLRenderer;
+
+      try {
+        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      } catch {
+        setFailed(true);
+        return;
+      }
+
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.domElement.style.width = "100%";
+      renderer.domElement.style.height = "100%";
+      renderer.domElement.style.display = "block";
+      renderer.domElement.style.touchAction = "pan-y";
+      container.appendChild(renderer.domElement);
+
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(30, 1, 1, 4000);
+
+      scene.add(new THREE.AmbientLight(0xfff2df, 0.7));
+      const key = new THREE.DirectionalLight(0xffe3ab, 1.6);
+      key.position.set(-90, 140, -160);
+      scene.add(key);
+      const rim = new THREE.DirectionalLight(0x8fb3ff, 0.6);
+      rim.position.set(90, 50, 170);
+      scene.add(rim);
+      const fill = new THREE.DirectionalLight(0xffffff, 0.22);
+      fill.position.set(140, -60, -40);
+      scene.add(fill);
+
+      const pebble = new THREE.Group();
+      pebble.rotation.y = props.initialYaw ?? 0.55;
+      scene.add(pebble);
+
+      const woodMat = new THREE.MeshPhysicalMaterial({
+        color: 0xa9764a,
+        roughness: 0.52,
+        metalness: 0.04,
+        clearcoat: 0.16,
+        clearcoatRoughness: 0.45,
+      });
+      const brassMat = new THREE.MeshStandardMaterial({
+        color: 0xd8b46a,
+        roughness: 0.28,
+        metalness: 0.9,
+      });
+
+      // The screen — a canvas texture over the real window cutout, double-sided
+      // so it reads correctly regardless of which way the plane's normal ends up.
+      const screenCanvas = document.createElement("canvas");
+      screenCanvas.width = 512;
+      screenCanvas.height = Math.round((512 / SCREEN_W) * SCREEN_H);
+      const screenCtx = screenCanvas.getContext("2d");
+      const screenTex = new THREE.CanvasTexture(screenCanvas);
+      screenTex.colorSpace = THREE.SRGBColorSpace;
+      const screenMesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(SCREEN_W, SCREEN_H),
+        new THREE.MeshBasicMaterial({ map: screenTex, side: THREE.DoubleSide }),
+      );
+      screenMesh.position.set(...SCREEN_POS);
+      if (screenCtx)
+        drawScreen(screenCtx, screenCanvas.width, screenCanvas.height, 0);
+      screenTex.needsUpdate = true;
+
+      // The four STLs are ~2 MB. We are already inside `init()`, which only runs
+      // once the viewer is within a screen of the viewport, so this no longer
+      // competes with the hero for bandwidth.
+      const loader = new STLLoader();
+      {
+        Promise.all(
+          PARTS.map(({ file, material }) =>
+            loader.loadAsync(MODEL_BASE + file).then((geometry) => {
+              geometry.computeVertexNormals();
+              const mesh = new THREE.Mesh(
+                geometry,
+                material === "wood" ? woodMat : brassMat,
+              );
+              pebble.add(mesh);
+            }),
+          ),
+        )
+          .then(() => {
+            if (disposed) return;
+            pebble.add(screenMesh);
+
+            // Recentre on the true combined bounding box, then frame the camera
+            // to it — robust to the exact mm envelope rather than a hardcoded guess.
+            const box = new THREE.Box3().setFromObject(pebble);
+            const center = box.getCenter(new THREE.Vector3());
+            pebble.children.forEach((child) => {
+              child.position.sub(center);
+            });
+            const size = box.getSize(new THREE.Vector3());
+            const radius = size.length() / 2;
+            const dist =
+              (radius / Math.sin((camera.fov * Math.PI) / 360)) * 1.35;
+            camera.position.set(0, radius * 0.14, -dist);
+            camera.lookAt(0, 0, 0);
+            camera.near = dist / 50;
+            camera.far = dist * 8;
+            camera.updateProjectionMatrix();
+
+            setReady(true);
+          })
+          .catch(() => {
+            if (!disposed) setFailed(true);
+          });
+      }
+
+      // --- visibility gate for the render loop ------------------------------
+      // Without this the loop keeps issuing GPU frames for a canvas that may be
+      // scrolled well off screen.
+      let onscreen = false;
+      const visObserver = new IntersectionObserver(
+        (entries) => {
+          onscreen = entries.some((e) => e.isIntersecting);
+        },
+        { threshold: 0 },
+      );
+      visObserver.observe(container);
+
+      // --- sizing -------------------------------------------------------
+      const resize = () => {
+        if (!container) return;
+        const w = container.clientWidth || 1;
+        const h = container.clientHeight || 1;
+        renderer.setSize(w, h, false);
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+      };
+      const ro = new ResizeObserver(resize);
+      ro.observe(container);
+      resize();
+
+      // --- drag-to-rotate -------------------------------------------------
+      let dragging = false;
+      let lastX = 0;
+      const el = renderer.domElement;
+      const onDown = (e: PointerEvent) => {
+        dragging = true;
+        lastX = e.clientX;
+        el.setPointerCapture(e.pointerId);
+        el.style.cursor = "grabbing";
+      };
+      const onMove = (e: PointerEvent) => {
+        if (!dragging) return;
+        const dx = e.clientX - lastX;
+        lastX = e.clientX;
+        pebble.rotation.y += dx * 0.012;
+      };
+      const onUp = (e: PointerEvent) => {
+        dragging = false;
+        el.style.cursor = "grab";
+        try {
+          el.releasePointerCapture(e.pointerId);
+        } catch {
+          /* already released */
+        }
+      };
+      el.style.cursor = "grab";
+      el.addEventListener("pointerdown", onDown);
+      el.addEventListener("pointermove", onMove);
+      el.addEventListener("pointerup", onUp);
+      el.addEventListener("pointercancel", onUp);
+
+      // --- e-ink screen cycle: draw → flash white → next scene -----------
+      let sceneIndex: SceneId = 0;
+      const cycleScreen = () => {
+        if (!screenCtx) return;
+        screenCtx.fillStyle = INK.paper;
+        screenCtx.fillRect(0, 0, screenCanvas.width, screenCanvas.height);
+        screenTex.needsUpdate = true;
+        window.setTimeout(() => {
+          sceneIndex = ((sceneIndex + 1) % 3) as SceneId;
+          drawScreen(
+            screenCtx,
+            screenCanvas.width,
+            screenCanvas.height,
+            sceneIndex,
+          );
+          screenTex.needsUpdate = true;
+        }, 260);
+      };
+      const cycleInterval = prefersReducedMotion()
+        ? 0
+        : window.setInterval(cycleScreen, 4800);
+
+      // --- render loop -----------------------------------------------------
+      const reduced = prefersReducedMotion();
+      const autoRotate = (props.autoRotate ?? true) && !reduced;
+      const loop = () => {
+        if (disposed) return;
+        raf = requestAnimationFrame(loop);
+        // Offscreen or backgrounded: keep the rAF ticking (so we resume on the
+        // very next frame) but do no GPU work and let no time pass in the scene.
+        if (!onscreen || document.visibilityState !== "visible") return;
+        if (autoRotate && !dragging) {
+          pebble.rotation.y += 0.0032;
+        }
+        renderer.render(scene, camera);
+      };
+      loop();
+
+      // Registered on the closure rather than via onCleanup(): by the time
+      // `init()` resolves we are outside Solid's synchronous owner scope, so
+      // onCleanup() here would never be attached.
+      teardown = () => {
+        cancelAnimationFrame(raf);
+        if (cycleInterval) window.clearInterval(cycleInterval);
+        ro.disconnect();
+        visObserver.disconnect();
+        el.removeEventListener("pointerdown", onDown);
+        el.removeEventListener("pointermove", onMove);
+        el.removeEventListener("pointerup", onUp);
+        el.removeEventListener("pointercancel", onUp);
+        pebble.traverse((obj) => {
+          const mesh = obj as THREE_NS.Mesh;
+          if (mesh.isMesh) mesh.geometry.dispose();
+        });
+        woodMat.dispose();
+        brassMat.dispose();
+        screenTex.dispose();
+        renderer.dispose();
+        if (renderer.domElement.parentNode === container) {
+          container?.removeChild(renderer.domElement);
+        }
+      };
+    }
   });
 
   return (
     <div class={`relative mx-auto w-full max-w-sm ${props.class ?? ""}`}>
       <div
         class="absolute -inset-10 -z-10 rounded-full opacity-60 blur-3xl"
-        style={{ background: "radial-gradient(circle, rgb(251 191 36 / 0.22), transparent 65%)" }}
+        style={{
+          background:
+            "radial-gradient(circle, rgb(251 191 36 / 0.22), transparent 65%)",
+        }}
         aria-hidden="true"
       />
       <Show when={!failed()} fallback={<Device />}>

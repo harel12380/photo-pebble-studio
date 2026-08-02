@@ -1,4 +1,4 @@
-import { type JSX, type ParentProps, mergeProps } from "solid-js";
+import { type JSX, type ParentProps, onCleanup, onMount } from "solid-js";
 import { prefersReducedMotion } from "./motion";
 
 /**
@@ -33,35 +33,84 @@ export function SpotlightCard(
 }
 
 /**
- * A captioned placeholder for a real photo/render the owner drops in later.
- * SWAP POINT: replace this with `<img src="..." />` once assets live in
- * `web/landing/assets/` (or `web/public/landing/`).
+ * A framed render with an optional caption. Every image here is a real render
+ * of the v14 CAD, produced by the pipeline documented in `marketing/README.md`
+ * and copied into `web/public/landing-media/`.
  */
-export function Placeholder(
-  props: { caption: string; ratio?: string; class?: string },
-): JSX.Element {
-  const merged = mergeProps({ ratio: "4 / 3" }, props);
+export function Figure(props: {
+  src: string;
+  alt: string;
+  caption?: string;
+  /** Set on above-the-fold images so they are not lazy-loaded. */
+  eager?: boolean;
+  ratio?: string;
+  class?: string;
+  imgClass?: string;
+}): JSX.Element {
   return (
-    <div
-      class={`flex items-center justify-center rounded-2xl border border-dashed border-white/15 bg-white/[0.03] text-center ${props.class ?? ""}`}
-      style={{ "aspect-ratio": merged.ratio }}
-    >
-      <div class="flex flex-col items-center gap-2 p-6 text-zinc-500">
-        <svg
-          class="h-8 w-8"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.5"
-          aria-hidden="true"
-        >
-          <rect x="3" y="4" width="18" height="16" rx="2" />
-          <circle cx="8.5" cy="9.5" r="1.5" />
-          <path d="m4 18 5-5 4 4 3-3 4 4" />
-        </svg>
-        <span class="text-sm font-medium">{props.caption}</span>
+    <figure class={`group ${props.class ?? ""}`}>
+      <div class="media-frame overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02]">
+        <img
+          src={props.src}
+          alt={props.alt}
+          loading={props.eager ? "eager" : "lazy"}
+          decoding="async"
+          class={`block h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03] ${props.imgClass ?? ""}`}
+          style={props.ratio ? { "aspect-ratio": props.ratio } : undefined}
+        />
       </div>
-    </div>
+      {props.caption && (
+        <figcaption class="mt-3 text-center text-sm text-zinc-400">
+          {props.caption}
+        </figcaption>
+      )}
+    </figure>
+  );
+}
+
+/**
+ * A muted, looping clip that only plays while it is on screen, so an offscreen
+ * video never burns battery. Under reduced motion it never starts and the
+ * poster frame stands in.
+ */
+export function AutoVideo(props: {
+  webm: string;
+  mp4: string;
+  poster: string;
+  alt: string;
+  class?: string;
+}): JSX.Element {
+  let el: HTMLVideoElement | undefined;
+
+  onMount(() => {
+    if (!el || prefersReducedMotion()) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) void el?.play().catch(() => {});
+          else el?.pause();
+        }
+      },
+      { threshold: 0.25 },
+    );
+    io.observe(el);
+    onCleanup(() => io.disconnect());
+  });
+
+  return (
+    <video
+      ref={el}
+      class={`block w-full rounded-2xl border border-white/10 ${props.class ?? ""}`}
+      poster={props.poster}
+      muted
+      loop
+      playsinline
+      preload="metadata"
+      aria-label={props.alt}
+    >
+      <source src={props.webm} type="video/webm" />
+      <source src={props.mp4} type="video/mp4" />
+    </video>
   );
 }
 

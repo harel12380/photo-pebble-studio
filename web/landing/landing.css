@@ -12,6 +12,16 @@
  * RTL-first — the sheen sweeps right→left (reading direction) and the marquee
  * translates +x. */
 
+/* ---- Page canvas -------------------------------------------------------- */
+/* The studio's stylesheet paints `body` its light-theme grey (#f5f6f8). The
+ * landing is dark and only covers `body` down to its own min-h-screen wrapper,
+ * so without this the iOS rubber-band overscroll and the browser's overscroll
+ * area flash white against a #0a0a0c page. Paint the root itself. */
+html,
+body {
+  background-color: #0a0a0c;
+}
+
 /* ---- Display type ------------------------------------------------------ */
 .font-display {
   font-family: "Suez One", "Heebo", system-ui, sans-serif;
@@ -43,16 +53,32 @@
   overflow: hidden;
   pointer-events: none;
   background:
-    radial-gradient(ellipse 80% 55% at 50% -12%, rgb(251 191 36 / 0.16), transparent 62%),
-    radial-gradient(ellipse 42% 34% at 78% 8%, rgb(244 114 182 / 0.07), transparent 60%),
-    radial-gradient(ellipse 46% 36% at 18% 16%, rgb(96 165 250 / 0.06), transparent 60%);
+    radial-gradient(
+      ellipse 80% 55% at 50% -12%,
+      rgb(251 191 36 / 0.16),
+      transparent 62%
+    ),
+    radial-gradient(
+      ellipse 42% 34% at 78% 8%,
+      rgb(244 114 182 / 0.07),
+      transparent 60%
+    ),
+    radial-gradient(
+      ellipse 46% 36% at 18% 16%,
+      rgb(96 165 250 / 0.06),
+      transparent 60%
+    );
 }
 .glow-cta {
   position: absolute;
   inset: 0;
   overflow: hidden;
   pointer-events: none;
-  background: radial-gradient(ellipse 70% 65% at 50% 112%, rgb(251 191 36 / 0.13), transparent 65%);
+  background: radial-gradient(
+    ellipse 70% 65% at 50% 112%,
+    rgb(251 191 36 / 0.13),
+    transparent 65%
+  );
 }
 
 /* ---- Scroll reveal (IntersectionObserver path) ------------------------- */
@@ -146,15 +172,27 @@
 
 /* ---- Marquee (spec strip) ----------------------------------------------- */
 /* Content is duplicated twice in the DOM; the track slides +x (RTL forward)
- * by half its width, then loops. Faded at both edges with a mask. */
+ * until copy 2 sits exactly where copy 1 started, then loops. Faded at both
+ * edges with a mask.
+ *
+ * The offset is NOT 50%. With N chips duplicated to 2N, the track is
+ * 2N chips + (2N-1) gaps wide, so 50% of it is N chips + (N-0.5) gaps — half a
+ * gap short of one full copy. That half-gap is a visible snap on every loop.
+ * Correct the shift by half a gap. */
 .marquee {
+  --marquee-gap: 0.75rem;
   overflow: hidden;
   mask-image: linear-gradient(to right, transparent, #000 12% 88%, transparent);
-  -webkit-mask-image: linear-gradient(to right, transparent, #000 12% 88%, transparent);
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 12% 88%,
+    transparent
+  );
 }
 .marquee-track {
   display: flex;
-  gap: 0.75rem;
+  gap: var(--marquee-gap);
   width: max-content;
   animation: marquee 36s linear infinite;
 }
@@ -163,13 +201,82 @@
 }
 @keyframes marquee {
   to {
-    translate: 50% 0;
+    translate: calc(50% + var(--marquee-gap) / 2) 0;
   }
 }
 
+/* ---- Scroll-scrubbed turntable ------------------------------------------- */
+/* A 60-frame WebP sequence of the real v14 renders, scrubbed by scroll offset
+ * (see Turntable.tsx). A warm pool of light sits behind the canvas so the
+ * pebble reads as if it were on a lit stage rather than pasted onto the page. */
+/* The canvas shows a CROP of the frame (see CROP in Turntable.tsx) and the
+ * subject is portrait, so the stage is sized from viewport HEIGHT and the width
+ * follows from the aspect ratio. The third term in `min()` keeps that derived
+ * width inside the viewport on narrow screens — 0.765 is the crop ratio, and
+ * 3rem is the stage's horizontal padding. */
+/* Sized from viewport HEIGHT: the subject is portrait and the stage is pinned
+ * full-screen, so height is the constraint that matters and the width follows
+ * from the crop's aspect ratio. The third term keeps that derived width inside
+ * the viewport on narrow screens (0.749 is the crop ratio, 3rem the padding).
+ *
+ * Edge feathering is done inside the canvas (see `feather()` in Turntable.tsx),
+ * not with a CSS mask — `mask-composite` and `-webkit-mask-composite` take
+ * different keyword sets and are not aliases, so a two-layer mask is an easy
+ * way to end up with an element that silently renders nothing. */
+.turntable-canvas {
+  display: block;
+  height: min(72vh, 640px, calc((100vw - 3rem) / 0.749));
+  width: auto;
+}
+
+/* A warm pool of light behind the pebble. Spread wide rather than tall: the
+ * stage box is now narrow and tall, so a percentage inset that looked generous
+ * on the old 16:9 box would hug the subject here. */
+.turntable-stage::before {
+  content: "";
+  position: absolute;
+  inset: -6% -55%;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 46% 46% at 50% 52%,
+    rgb(251 191 36 / 0.17),
+    transparent 68%
+  );
+  filter: blur(8px);
+}
+.turntable-hint {
+  transition: opacity 0.6s ease;
+}
+.turntable-hint.is-hidden {
+  opacity: 0;
+}
+
+/* ---- The e-ink artwork --------------------------------------------------- */
+/* The screen art is a genuine 400x600 six-colour dither. Scaling it must keep
+ * the dither pattern crisp — smoothing it would misrepresent the panel. */
+.eink-art {
+  image-rendering: pixelated;
+}
+
+/* ---- Framed renders ------------------------------------------------------ */
+.media-frame {
+  position: relative;
+  box-shadow:
+    0 24px 60px -24px rgb(0 0 0 / 0.9),
+    inset 0 1px 0 rgb(255 255 255 / 0.06);
+}
+
 /* ---- Sticky story chapter ----------------------------------------------- */
-/* The device pins while captions scroll past; the active caption swaps the
- * pinned scene via a data attribute (set by an IntersectionObserver). */
+/* The media pins while captions scroll past; the active caption swaps the
+ * pinned scene (class toggled by an IntersectionObserver). Scenes are stacked
+ * on top of each other so the column height stays stable as they cross-fade. */
+.story-stage {
+  display: grid;
+}
+.story-stage > .story-scene {
+  grid-area: 1 / 1;
+}
 .story-scene {
   opacity: 0;
   transform: scale(0.96);
@@ -181,8 +288,12 @@
   opacity: 1;
   transform: none;
 }
+/* Inactive captions dim, but not below the point where their <h2> stops being
+ * readable — at 0.25 the headings sat near a 2:1 contrast ratio while remaining
+ * in the document outline, so a screen-reader user got three headings and a
+ * sighted user could see one. 0.45 keeps the focus effect and stays legible. */
 .story-caption {
-  opacity: 0.25;
+  opacity: 0.45;
   transition: opacity 0.5s ease;
 }
 .story-caption.is-active {
@@ -268,7 +379,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(ellipse at center, rgb(24 24 27 / 0.35), transparent 70%);
+  background: radial-gradient(
+    ellipse at center,
+    rgb(24 24 27 / 0.35),
+    transparent 70%
+  );
 }
 .pebble-spinner {
   width: 2rem;
@@ -284,47 +399,9 @@
   }
 }
 
-/* ---- Scroll cue ---------------------------------------------------------- */
-.scroll-cue {
-  animation: nudge 2s ease-in-out infinite;
-}
-@keyframes nudge {
-  0%,
-  100% {
-    transform: translateY(0);
-    opacity: 0.4;
-  }
-  50% {
-    transform: translateY(8px);
-    opacity: 0.9;
-  }
-}
-
-/* ---- Scroll-driven parallax (progressive enhancement) -------------------- */
-/* Firefox stable lacks animation-timeline; there it simply stays static. */
-@supports (animation-timeline: view()) {
-  .parallax-slow,
-  .parallax-fast {
-    animation: parallax linear both;
-    animation-timeline: view();
-    animation-range: cover;
-    animation-duration: 1ms; /* Firefox requires non-zero duration */
-  }
-  .parallax-slow {
-    --parallax: 42px;
-  }
-  .parallax-fast {
-    --parallax: 90px;
-  }
-  @keyframes parallax {
-    from {
-      transform: translateY(var(--parallax));
-    }
-    to {
-      transform: translateY(calc(var(--parallax) * -1));
-    }
-  }
-}
+/* NOTE: `.scroll-cue`, `.parallax-slow` and `.parallax-fast` used to live here.
+ * Nothing in the page referenced them, so they were removed rather than left as
+ * a trap for the next person grepping for the parallax that isn't there. */
 
 /* ---- Reduced motion: hold everything still ------------------------------- */
 @media (prefers-reduced-motion: reduce) {
@@ -339,15 +416,23 @@
   .marquee-track,
   .device,
   .eink-sweep,
-  .scroll-cue,
-  .parallax-slow,
-  .parallax-fast,
   .pebble-spinner {
     animation: none;
   }
   .story-scene,
   .story-caption,
+  .turntable-hint,
   .spot-card::after {
     transition: none;
+  }
+  /* The turntable stops scrubbing in JS; collapse its scroll track so the page
+   * does not carry 2.6 viewports of dead space. */
+  .turntable-track {
+    height: auto !important;
+  }
+  .turntable-track > div {
+    position: static !important;
+    height: auto !important;
+    padding-block: 2rem;
   }
 }
