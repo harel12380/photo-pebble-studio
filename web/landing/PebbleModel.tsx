@@ -6,15 +6,17 @@ import { type JSX, Show, createSignal, onCleanup, onMount } from "solid-js";
 import type * as THREE_NS from "three";
 import { prefersReducedMotion } from "./motion";
 import { Device } from "./Device";
+import { PEBBLE_MODEL_BASE } from "./pebbleVersion";
 
 /**
- * Real Photo Pebble geometry (v14, the current enclosure — see
- * enclosure/fusion/DESIGN-NOTES.md §7o/§7p). These are the exact STLs that go
- * to the slicer, served from web/public/models/pebble-v14/ so this viewer never
- * drifts from the physical object — and so it matches the rendered stills and
- * the turntable elsewhere on this page, which come from the same CAD.
+ * Real Photo Pebble geometry — the current enclosure revision is whatever
+ * `PEBBLE_VERSION` says (see enclosure/fusion/DESIGN-NOTES.md; v15 is §7q).
+ * These are the exact STLs that go to the slicer, served from
+ * web/public/models/pebble-<ver>/ so this viewer never drifts from the physical
+ * object — and so it matches the rendered stills and the turntable elsewhere on
+ * this page, which come from the same CAD.
  */
-const MODEL_BASE = "../models/pebble-v14/";
+const MODEL_BASE = PEBBLE_MODEL_BASE;
 const PARTS: Array<{ file: string; material: "wood" | "brass" }> = [
   { file: "front_shell.stl", material: "wood" },
   { file: "back_shell.stl", material: "wood" },
@@ -134,7 +136,7 @@ export type PebbleModelProps = {
 };
 
 /**
- * A real-time WebGL render of the actual v12 enclosure STLs — not a mockup.
+ * A real-time WebGL render of the actual enclosure STLs — not a mockup.
  * Auto-rotates gently and responds to drag; the "screen" is a canvas texture
  * cycling the same three ink scenes as the flat <Device> mockup, with a
  * flash between frames standing in for an e-ink refresh. Falls back to the

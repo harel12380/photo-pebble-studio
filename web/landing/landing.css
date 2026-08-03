@@ -206,7 +206,7 @@ body {
 }
 
 /* ---- Scroll-scrubbed turntable ------------------------------------------- */
-/* A 60-frame WebP sequence of the real v14 renders, scrubbed by scroll offset
+/* A 60-frame WebP sequence of the real CAD renders, scrubbed by scroll offset
  * (see Turntable.tsx). A warm pool of light sits behind the canvas so the
  * pebble reads as if it were on a lit stage rather than pasted onto the page. */
 /* The canvas shows a CROP of the frame (see CROP in Turntable.tsx) and the

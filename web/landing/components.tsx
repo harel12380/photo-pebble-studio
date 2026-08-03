@@ -34,7 +34,7 @@ export function SpotlightCard(
 
 /**
  * A framed render with an optional caption. Every image here is a real render
- * of the v14 CAD, produced by the pipeline documented in `marketing/README.md`
+ * of the CAD at PEBBLE_VERSION, produced by the pipeline documented in `marketing/README.md`
  * and copied into `web/public/landing-media/`.
  */
 export function Figure(props: {

@@ -9,7 +9,7 @@ import { AutoVideo, Figure, SpecChip, SpotlightCard } from "./components";
  *  story first, then hands the visitor to the studio. */
 const STUDIO_URL = "../";
 
-/** All imagery is a render of the real v14 CAD — see marketing/README.md. */
+/** All imagery is a render of the real CAD at PEBBLE_VERSION — see marketing/README.md. */
 const MEDIA = "../landing-media/";
 
 // ---------------------------------------------------------------------------

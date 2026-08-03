@@ -4,7 +4,8 @@ import { prefersReducedMotion } from "./motion";
 /**
  * Scroll-scrubbed 360° turntable.
  *
- * The frames are real renders of the v14 CAD (see ../../../marketing/), exported
+ * The frames are real renders of the current CAD revision (PEBBLE_VERSION in
+ * ./pebbleVersion.ts; see ../../../marketing/), exported
  * as 60 WebP stills — the whole sequence is ~420 KB because the studio backdrop
  * compresses extremely well. We scrub a frame sequence rather than seeking a
  * <video>, because `video.currentTime` scrubbing is jittery on Safari/iOS and
